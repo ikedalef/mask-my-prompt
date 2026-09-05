@@ -23,7 +23,7 @@
           <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
           <span id="creditBadgeText">1 Free Run</span>
         </div>
-        <button onclick="openModal()" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all flex items-center gap-1">
+        <button id="buyBtnHeader" onclick="openModal()" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all flex items-center gap-1">
           <span>⚡</span> Lifetime Pass ($5)
         </button>
       </div>
@@ -117,7 +117,6 @@
       </p>
 
       <div class="space-y-3 mb-6">
-        <!-- 差し替え済み専用決済リンク -->
         <a href="https://buy.stripe.com/eVq00j1J99vIdNneaw5J607" class="block w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold text-sm hover:brightness-110 shadow-lg shadow-emerald-500/20 transition">
           ⚡ Get Lifetime Access — $5
         </a>
@@ -144,6 +143,17 @@
     const PROMO_EXPIRES_AT = new Date("2026-09-08T23:59:59Z").getTime();
     let tokenMap = {};
 
+    function checkPaymentReturn() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("unlocked") === "true") {
+        localStorage.setItem("mmp_pro_status", "lifetime");
+        localStorage.removeItem("mmp_pro_until");
+        // URLのパラメータを綺麗に消去
+        window.history.replaceState({}, document.title, window.location.pathname);
+        alert("🎉 Thank you for your purchase! Lifetime Pro Access has been successfully unlocked.");
+      }
+    }
+
     function isProActive() {
       const status = localStorage.getItem("mmp_pro_status");
       if (status === "lifetime") return true;
@@ -167,9 +177,14 @@
 
     function updateBadge() {
       const badgeText = document.getElementById("creditBadgeText");
+      const buyBtnHeader = document.getElementById("buyBtnHeader");
+
       if (isProActive()) {
         const status = localStorage.getItem("mmp_pro_status");
         badgeText.textContent = status === "lifetime" ? "Unlimited Pro" : "Pro Trial (3 Days)";
+        if (status === "lifetime" && buyBtnHeader) {
+          buyBtnHeader.style.display = "none";
+        }
       } else {
         const used = getUsedRuns();
         badgeText.textContent = used >= 1 ? "0 Free Runs Left" : "1 Free Run";
@@ -308,7 +323,10 @@ Please send the revised proposal of $45,000 to Sarah Jenkins at sarah.jenkins@ac
 Under our NDA, do not disclose these figures externally.`;
     }
 
-    window.addEventListener("DOMContentLoaded", updateBadge);
+    window.addEventListener("DOMContentLoaded", () => {
+      checkPaymentReturn();
+      updateBadge();
+    });
   </script>
 </body>
 </html>
