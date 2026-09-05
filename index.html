@@ -40,7 +40,7 @@
         Use ChatGPT & Claude <br class="hidden sm:inline"/><span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400">Without Leaking Client Secrets.</span>
       </h1>
       <p class="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
-        Mask sensitive emails, deal sizes, names, and companies before sending them to AI. Restore original details with 1 click when the AI replies.
+        Mask emails, deal figures, and proprietary project names before sending to AI. Restore original identities with 1 click when the model responds.
       </p>
     </div>
 
@@ -50,6 +50,16 @@
         <span class="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/20 border border-indigo-500/40 text-[10px] text-indigo-300">1</span>
         Mask Confidential Text (Before AI)
       </div>
+
+      <!-- Custom Words Input (実務強化) -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 mb-4">
+        <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+          <span>Custom Sensitive Words (Names, Code Names, Project Titles)</span>
+          <span class="text-[11px] text-slate-500 font-normal">Comma-separated</span>
+        </label>
+        <input id="customKeywords" type="text" placeholder="e.g. Sarah Jenkins, Project Apollo, AlphaCorp" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-indigo-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono">
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
           <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3 text-xs">
@@ -67,7 +77,7 @@
             <span class="font-bold text-emerald-400">Sanitized Prompt (Safe to feed AI)</span>
             <span id="maskedStats" class="text-slate-500 font-mono text-[11px]">0 tokens masked</span>
           </div>
-          <textarea id="maskedOutput" readonly placeholder="Sanitized prompt with tokens like [EMAIL_1] and [COMPANY_A] will generate here..." class="w-full h-64 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-xs text-emerald-400 font-mono focus:outline-none resize-none leading-relaxed"></textarea>
+          <textarea id="maskedOutput" readonly placeholder="Sanitized prompt with tokens like [CUSTOM_1] and [COMPANY_A] will generate here..." class="w-full h-64 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-xs text-emerald-400 font-mono focus:outline-none resize-none leading-relaxed"></textarea>
           <button onclick="copyMasked()" class="mt-3 w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-1.5">
             <span>📋</span> Copy Sanitized Prompt for AI
           </button>
@@ -86,7 +96,7 @@
           <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3 text-xs">
             <span class="font-bold text-slate-300">AI Response (With Tokens)</span>
           </div>
-          <textarea id="aiResponseInput" placeholder="Paste the output received from ChatGPT/Claude containing [EMAIL_1], [COMPANY_A], etc..." class="w-full h-64 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500/50 resize-none leading-relaxed"></textarea>
+          <textarea id="aiResponseInput" placeholder="Paste the output received from ChatGPT/Claude containing [CUSTOM_1], [COMPANY_1], etc..." class="w-full h-64 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500/50 resize-none leading-relaxed"></textarea>
           <button onclick="unmaskText()" class="mt-3 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
             <span>⚡</span> Restore Original Names & Values
           </button>
@@ -148,7 +158,6 @@
       if (params.get("unlocked") === "true") {
         localStorage.setItem("mmp_pro_status", "lifetime");
         localStorage.removeItem("mmp_pro_until");
-        // URLのパラメータを綺麗に消去
         window.history.replaceState({}, document.title, window.location.pathname);
         alert("🎉 Thank you for your purchase! Lifetime Pro Access has been successfully unlocked.");
       }
@@ -232,6 +241,10 @@
       alert("Invalid license key.");
     }
 
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     function maskText() {
       if (!isProActive() && getUsedRuns() >= 1) {
         openModal();
@@ -246,6 +259,21 @@
 
       tokenMap = {};
       let count = 0;
+
+      // 0. カスタム機密単語（人名・プロジェクト名など）
+      const customKeywordsInput = document.getElementById("customKeywords").value;
+      if (customKeywordsInput.trim()) {
+        const keywords = customKeywordsInput.split(",").map(k => k.trim()).filter(k => k.length > 0);
+        keywords.forEach((keyword) => {
+          const regex = new RegExp(escapeRegExp(keyword), "gi");
+          text = text.replace(regex, (match) => {
+            count++;
+            const token = `[CUSTOM_${count}]`;
+            tokenMap[token] = match;
+            return token;
+          });
+        });
+      }
 
       // 1. メールアドレス
       text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, (match) => {
@@ -263,7 +291,7 @@
         return token;
       });
 
-      // 3. 企業名サフィックス（Corp, LLC, Inc, Ltd）
+      // 3. 企業名サフィックス（Corp, LLC, Inc, Ltd, GmbH）
       text = text.replace(/\b([A-Z][a-zA-Z0-9&]+(?:\s+[A-Z][a-zA-Z0-9&]+)*\s+(?:Inc|LLC|Corp|Ltd|GmbH|Co\.,\s?Ltd))\b/g, (match) => {
         count++;
         const token = `[COMPANY_${count}]`;
@@ -317,8 +345,9 @@
     }
 
     function loadSample() {
+      document.getElementById("customKeywords").value = "Sarah Jenkins, Project Apollo";
       document.getElementById("rawInput").value = `Hi team,
-We are closing the partnership with Acme Global LLC for the upcoming rollout.
+We are closing the partnership for Project Apollo with Acme Global LLC for the upcoming rollout.
 Please send the revised proposal of $45,000 to Sarah Jenkins at sarah.jenkins@acmeglobal.com or call her directly at +1-555-234-5678.
 Under our NDA, do not disclose these figures externally.`;
     }
